@@ -1,7 +1,7 @@
 import sys
 import multiprocessing
 
-
+# i'm stuck, the Service object does not run bc it doesn't wait for customers and finishes before it gets any.
 def main():
     testlist = []
     testlist.append(Customer("a"))
