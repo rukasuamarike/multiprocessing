@@ -1,24 +1,18 @@
 import sys
 import multiprocessing
+import threading
 
-# i'm stuck, the Service object does not run bc it doesn't wait for customers and finishes before it gets any.
 def main():
-    testlist = []
-    testlist.append(Customer("a"))
-    testlist.append(Customer("b"))
-    testlist.append(Customer("c"))
-    testlist.append(Customer("d"))
-    testlist.append(Customer("e"))
-    testlist.append(Customer("f"))
+    testlist = [Customer("a"), Customer("b"), Customer("c"), Customer("d"), Customer("e"), Customer("f")]
     jim = Service([], "jim")
     bob = Cashier(testlist, "bob", jim)
     jim.assistant = bob
-    cashier = multiprocessing.Process(target=bob.work)
-    service = multiprocessing.Process(target=jim.work)
-    cashier.start()
-    service.start()
-    cashier.join()
-    service.join()
+    cash = multiprocessing.Process(target=bob.work)
+    serve = multiprocessing.Process(target=jim.work)
+    cash.start()
+    serve.start()
+    cash.join()
+    serve.join()
 
 
 class Worker:
@@ -27,9 +21,11 @@ class Worker:
     customer = None
     customers = None
     on_shift = True
+
     def __init__(self, customers, name):
         self.customers = customers
         self.name = name
+        self.on_shift = True
 
     def take_order(self, customer):
         self.customer = customer
@@ -45,7 +41,6 @@ class Cashier(Worker):
         Worker.__init__(self, customers, name)
         self.assistant = assistant
 
-
     def pass_order(self, customer):
         if self.has_customers:
             print("{} paid and gave order to {}".format(customer.name, self.name))
@@ -58,16 +53,21 @@ class Cashier(Worker):
             print("{} has been removed from {}'s list".format(customer.name, self.name))
             self.has_order = False
 
-    def work(self):
-
+    def check_time(self):
         if len(self.customers) > 0:
             self.on_shift = True
-            for customer in self.customers:
+
+    def work(self):
+        if self.on_shift:
+            while len(self.customers) > 0:
+                customer = self.customers[0]
+                self.on_shift = True
                 k = self.customers.index(customer)
                 self.has_order = True
                 self.take_order(customer)
                 self.pass_order(customer)
-                # del self.customers[k] (this was how I removed)
+                del self.customers[k] # (this was how I removed)
+        self.check_time()
 
 
 class Service(Worker):
@@ -75,32 +75,33 @@ class Service(Worker):
         Worker.__init__(self, customers, name)
         self.assistant = None
 
-
     def do_order(self, customer):
-        print(self.has_order)
-        if self.has_customers:
-            customer.has_goods = True
-            print("{} has given {} their requested goods".format(self.name, customer.name))
-            self.has_order = False
-            # self.customers.remove(customer)
+        customer.has_goods = True
+        print("{} has given {} their requested goods".format(self.name, customer.name))
+        self.has_order = False
+        self.customers.remove(customer)
+
+    def check_time(self):
+        if self.assistant.on_shift:
+            self.on_shift = True
 
     def work(self):
-        while self.assistant.on_shift or len(self.customers) > 0:
-            if len(self.customers) > 0:
+        if self.on_shift:
+            print(self.customers)
+            while len(self.customers) > 0:
                 self.has_customers = True
-                for customer in self.customers:
-                    self.do_order(customer)
+                self.do_order(self.customers[0])
+        self.check_time()
 
 
 class Customer:
-
     has_order = True
     has_goods = False
     name = ""
     index = 0
+
     def __init__(self, name):
         self.name = name
-
 
 
 if __name__ == '__main__':
